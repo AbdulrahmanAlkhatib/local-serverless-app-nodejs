@@ -1,0 +1,82 @@
+service: serverless-app-demo
+frameworkVersion: '3'
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+
+custom:
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  environment:
+    SAMPLE_TABLE: ${self:service}-${sls:stage}
+  region: eu-north-1
+  stackName: sls-app-demo
+  httpApi:
+    cors: true
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan  
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${aws:region}:*:table/${self:provider.environment.SAMPLE_TABLE}"
+
+functions:
+  getAllItemsFunction:
+    handler: src/handlers/get-all-items.getAllItemsHandler
+    memorySize: 128
+    timeout: 100
+    architecture: x86_64
+    events:
+      - http:
+          path: /items
+          method: GET
+
+  getByIdFunction:
+    handler: src/handlers/get-by-id.getByIdHandler
+    memorySize: 128
+    timeout: 100
+    architecture: x86_64
+    events:
+      - http:
+          path: /{id}
+          method: GET
+
+  putItemFunction:
+    handler: src/handlers/put-item.putItemHandler
+    memorySize: 128
+    timeout: 100
+    architecture: x86_64
+    events:
+      - http:
+          path: /
+          method: POST
+
+resources:
+  Resources:
+    DynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.SAMPLE_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
